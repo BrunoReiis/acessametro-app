@@ -18,13 +18,13 @@ flutter pub get
 flutter run
 ```
 
-O endereço padrão da API é `http://10.0.2.2:3333/api`, adequado ao emulador Android com a API local na porta 3333. Para outros ambientes, passe a URL base incluindo `/api`:
+O app usa por padrão a API publicada em `https://acessametro-api.vercel.app/api`. Para desenvolver com a API local, passe a URL base incluindo `/api`:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:3333/api
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3333/api
 ```
 
-No simulador iOS, `localhost` aponta para a máquina de desenvolvimento. Em um aparelho físico, use o IP local do computador, por exemplo `http://192.168.1.20:3333/api`, e permita conexões pela rede local. Para produção, configure uma URL HTTPS.
+`10.0.2.2` aponta para a máquina host no emulador Android. No simulador iOS, use `http://localhost:3333/api`. Em um aparelho físico, use o IP local do computador, por exemplo `http://192.168.1.20:3333/api`, e permita conexões pela rede local.
 
 ## Verificar
 

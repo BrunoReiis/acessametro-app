@@ -15,7 +15,7 @@ class ApiService {
 
   static const _baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3333/api',
+    defaultValue: 'https://acessametro-api.vercel.app/api',
   );
   static const _tokenKey = 'access_token';
   static const _favoritesKey = 'favorite_station_ids';
