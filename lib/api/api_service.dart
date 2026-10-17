@@ -18,6 +18,7 @@ class ApiService {
     defaultValue: 'http://10.0.2.2:3333/api',
   );
   static const _tokenKey = 'access_token';
+  static const _favoritesKey = 'favorite_station_ids';
   static const _storage = FlutterSecureStorage();
   final http.Client _client;
   String? token;
@@ -89,6 +90,9 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getIncidents() async =>
       _list((await _send('GET', '/incidents'))['data']);
 
+  Future<List<Map<String, dynamic>>> getReviews() async =>
+      _list((await _send('GET', '/reviews'))['data']);
+
   Future<void> createIncident({
     required String title,
     required String description,
@@ -105,6 +109,43 @@ class ApiService {
         'stationId': stationId,
       },
     );
+  }
+
+  Future<void> createReview({
+    required String stationId,
+    required int rating,
+    String? comment,
+  }) async {
+    await _send(
+      'POST',
+      '/reviews',
+      body: {
+        'stationId': stationId,
+        'rating': rating,
+        'comment': comment,
+        'tags': <String>[],
+      },
+    );
+  }
+
+  Future<Set<String>> getFavoriteStationIds() async {
+    final encoded = await _storage.read(key: _favoritesKey);
+    if (encoded == null) return <String>{};
+    try {
+      return (jsonDecode(encoded) as List).whereType<String>().toSet();
+    } on FormatException {
+      return <String>{};
+    }
+  }
+
+  Future<Set<String>> toggleFavoriteStation(String stationId) async {
+    final favorites = await getFavoriteStationIds();
+    if (!favorites.add(stationId)) favorites.remove(stationId);
+    await _storage.write(
+      key: _favoritesKey,
+      value: jsonEncode(favorites.toList()),
+    );
+    return favorites;
   }
 
   Future<Map<String, dynamic>> _send(

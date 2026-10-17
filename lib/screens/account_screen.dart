@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_service.dart';
+import 'station_detail_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key, required this.api});
@@ -22,6 +23,58 @@ class _AccountScreenState extends State<AccountScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<bool> _ensureLogin() async {
+    if (widget.api.token != null) return true;
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
+    );
+    if (loggedIn == true && mounted) setState(() {});
+    return loggedIn == true && mounted;
+  }
+
+  Future<void> _openFavorites() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FavoriteStationsScreen(api: widget.api),
+      ),
+    );
+  }
+
+  Future<void> _openActivity(ActivityKind kind) async {
+    if (!await _ensureLogin() || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProfileActivityScreen(api: widget.api, kind: kind),
+      ),
+    );
+  }
+
+  void _showPersonalInfo(Map<String, dynamic>? user) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Informações pessoais'),
+        content: user == null
+            ? const Text('Entre para consultar seus dados.')
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nome: ${user['name'] ?? 'Não informado'}'),
+                  const SizedBox(height: 8),
+                  Text('E-mail: ${user['email'] ?? 'Não informado'}'),
+                ],
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.api.currentUser;
@@ -29,7 +82,7 @@ class _AccountScreenState extends State<AccountScreen> {
       padding: const EdgeInsets.fromLTRB(20, 25, 20, 30),
       children: [
         const Text(
-          'Conta',
+          'Meu perfil',
           style: TextStyle(
             fontSize: 27,
             fontWeight: FontWeight.w800,
@@ -124,6 +177,48 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
         ),
         const SizedBox(height: 18),
+        _ProfileOption(
+          icon: Icons.badge_outlined,
+          title: 'Informações pessoais',
+          onTap: () => _showPersonalInfo(user),
+        ),
+        _ProfileOption(
+          icon: Icons.favorite_border,
+          title: 'Meus favoritos',
+          onTap: _openFavorites,
+        ),
+        _ProfileOption(
+          icon: Icons.star_outline,
+          title: 'Minhas avaliações',
+          onTap: () => _openActivity(ActivityKind.reviews),
+        ),
+        _ProfileOption(
+          icon: Icons.campaign_outlined,
+          title: 'Minhas denúncias',
+          onTap: () => _openActivity(ActivityKind.incidents),
+        ),
+        _ProfileOption(
+          icon: Icons.info_outline,
+          title: 'Sobre o AcessaMetrô',
+          onTap: () => showAboutDialog(
+            context: context,
+            applicationName: 'AcessaMetrô',
+            applicationVersion: '1.0.0',
+            applicationLegalese: 'Mobilidade com autonomia.',
+          ),
+        ),
+        if (user != null) ...[
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Sair da conta'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFB42332),
+            ),
+          ),
+        ],
+        const SizedBox(height: 18),
         const _AccountInfo(
           icon: Icons.accessible_forward,
           title: 'Acessibilidade compartilhada',
@@ -138,6 +233,235 @@ class _AccountScreenState extends State<AccountScreen> {
       ],
     );
   }
+}
+
+enum ActivityKind { incidents, reviews }
+
+class FavoriteStationsScreen extends StatefulWidget {
+  const FavoriteStationsScreen({super.key, required this.api});
+  final ApiService api;
+  @override
+  State<FavoriteStationsScreen> createState() => _FavoriteStationsScreenState();
+}
+
+class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
+  late Future<List<Map<String, dynamic>>> _stations;
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    final ids = await widget.api.getFavoriteStationIds();
+    final stations = await widget.api.getStations();
+    return stations.where((station) => ids.contains(station['id'])).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _stations = _load();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Meus favoritos')),
+    body: FutureBuilder<List<Map<String, dynamic>>>(
+      future: _stations,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                snapshot.error is ApiException
+                    ? (snapshot.error as ApiException).message
+                    : 'Não foi possível carregar os favoritos.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+        final stations = snapshot.data ?? [];
+        if (stations.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(28),
+              child: Text(
+                'Estações salvas como favoritas aparecerão aqui.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            ),
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final station in stations)
+              ListTile(
+                leading: const Icon(
+                  Icons.train_outlined,
+                  color: Color(0xFF0868E8),
+                ),
+                title: Text(station['name'] as String? ?? 'Estação'),
+                subtitle: Text(
+                  station['line'] as String? ?? 'Linha não informada',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => StationDetailScreen(
+                        api: widget.api,
+                        stationId: station['id'] as String,
+                      ),
+                    ),
+                  );
+                  if (mounted) setState(() => _stations = _load());
+                },
+              ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class ProfileActivityScreen extends StatefulWidget {
+  const ProfileActivityScreen({
+    super.key,
+    required this.api,
+    required this.kind,
+  });
+  final ApiService api;
+  final ActivityKind kind;
+  @override
+  State<ProfileActivityScreen> createState() => _ProfileActivityScreenState();
+}
+
+class _ProfileActivityScreenState extends State<ProfileActivityScreen> {
+  late Future<List<Map<String, dynamic>>> _items;
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    final userId = widget.api.currentUser?['id'];
+    if (widget.kind == ActivityKind.incidents) {
+      final items = await widget.api.getIncidents();
+      return items.where((item) => item['userId'] == userId).toList();
+    }
+    final items = await widget.api.getReviews();
+    return items.where((item) => item['userId'] == userId).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _items = _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isIncident = widget.kind == ActivityKind.incidents;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isIncident ? 'Minhas denúncias' : 'Minhas avaliações'),
+      ),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _items,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  snapshot.error is ApiException
+                      ? (snapshot.error as ApiException).message
+                      : 'Não foi possível carregar sua atividade.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+          final items = snapshot.data ?? [];
+          if (items.isEmpty) {
+            return Center(
+              child: Text(
+                isIncident
+                    ? 'Você ainda não enviou denúncias.'
+                    : 'Você ainda não avaliou estações.',
+                style: const TextStyle(color: Color(0xFF64748B)),
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final station = item['station'] is Map
+                  ? item['station'] as Map
+                  : const {};
+              return Card(
+                color: Colors.white,
+                elevation: 0,
+                child: ListTile(
+                  leading: Icon(
+                    isIncident ? Icons.campaign_outlined : Icons.star_outline,
+                    color: const Color(0xFF0868E8),
+                  ),
+                  title: Text(
+                    item['title'] as String? ??
+                        station['name'] as String? ??
+                        'Atividade',
+                  ),
+                  subtitle: Text(station['name'] as String? ?? ''),
+                  trailing: isIncident
+                      ? Text(_statusLabel(item['status'] as String?))
+                      : Text('${item['rating'] ?? 0}/5'),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  String _statusLabel(String? status) => switch (status) {
+    'RESOLVED' => 'Resolvido',
+    'IN_PROGRESS' => 'Em andamento',
+    'REJECTED' => 'Encerrado',
+    _ => 'Pendente',
+  };
+}
+
+class _ProfileOption extends StatelessWidget {
+  const _ProfileOption({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: Icon(icon, color: const Color(0xFF263B53)),
+    title: Text(
+      title,
+      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+    ),
+    trailing: const Icon(
+      Icons.chevron_right,
+      size: 19,
+      color: Color(0xFF94A3B8),
+    ),
+    onTap: onTap,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+    dense: true,
+  );
 }
 
 class LoginScreen extends StatefulWidget {

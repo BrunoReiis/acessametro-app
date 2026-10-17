@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api/api_service.dart';
+import 'station_detail_screen.dart';
 
 class StationsScreen extends StatefulWidget {
   const StationsScreen({super.key, required this.api});
@@ -40,22 +41,14 @@ class _StationsScreenState extends State<StationsScreen> {
   }
 
   Future<void> _details(Map<String, dynamic> station) async {
-    try {
-      final details = await widget.api.getStation(station['id'] as String);
-      if (!mounted) return;
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => _StationDetails(station: details),
-      );
-    } on ApiException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
-      }
-    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => StationDetailScreen(
+          api: widget.api,
+          stationId: station['id'] as String,
+        ),
+      ),
+    );
   }
 
   @override
@@ -219,106 +212,6 @@ class _StationTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _StationDetails extends StatelessWidget {
-  const _StationDetails({required this.station});
-  final Map<String, dynamic> station;
-  @override
-  Widget build(BuildContext context) {
-    final reviews = station['reviews'] is List
-        ? station['reviews'] as List
-        : const [];
-    final incidents = station['incidents'] is List
-        ? station['incidents'] as List
-        : const [];
-    final ratings = reviews
-        .map((review) => (review as Map)['rating'])
-        .whereType<num>()
-        .toList();
-    final average = ratings.isEmpty
-        ? null
-        : ratings.reduce((a, b) => a + b) / ratings.length;
-    final routeInfo = [
-      station['line'],
-      station['zone'],
-    ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 8, 22, 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              station['name'] as String? ?? 'Estação',
-              style: const TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF132640),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(routeInfo, style: const TextStyle(color: Color(0xFF64748B))),
-            const SizedBox(height: 20),
-            _DetailRow(
-              icon: Icons.accessible_forward,
-              title: 'Acessibilidade',
-              detail:
-                  station['accessibility'] as String? ??
-                  'Ainda sem informações registradas.',
-            ),
-            const SizedBox(height: 15),
-            _DetailRow(
-              icon: Icons.star_outline,
-              title: 'Avaliação',
-              detail: average == null
-                  ? 'Sem avaliações'
-                  : '${average.toStringAsFixed(1)} de 5 · ${ratings.length} avaliações',
-            ),
-            const SizedBox(height: 15),
-            _DetailRow(
-              icon: Icons.campaign_outlined,
-              title: 'Relatos',
-              detail: '${incidents.length} ocorrências registradas',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.icon,
-    required this.title,
-    required this.detail,
-  });
-  final IconData icon;
-  final String title;
-  final String detail;
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, color: const Color(0xFF0868E8)),
-      const SizedBox(width: 13),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 3),
-            Text(
-              detail,
-              style: const TextStyle(color: Color(0xFF64748B), height: 1.4),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
 }
 
 class _LoadMessage extends StatelessWidget {

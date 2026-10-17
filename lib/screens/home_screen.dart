@@ -208,65 +208,164 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(17),
-            child: InkWell(
-              onTap: () => widget.onNavigate(2),
-              borderRadius: BorderRadius.circular(17),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 43,
-                      height: 43,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF0D7),
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      child: const Icon(
-                        Icons.campaign_outlined,
-                        color: Color(0xFFA96106),
-                      ),
-                    ),
-                    const SizedBox(width: 13),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Relatar um problema',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF132640),
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Ajude outras pessoas no caminho',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 15,
-                      color: Color(0xFF64748B),
-                    ),
-                  ],
+          Row(
+            children: [
+              Expanded(
+                child: _HomeAction(
+                  icon: Icons.alt_route,
+                  label: 'Planejar rota',
+                  color: const Color(0xFF0868E8),
+                  onTap: () => widget.onNavigate(2),
                 ),
               ),
-            ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: _HomeAction(
+                  icon: Icons.train,
+                  label: 'Ver estações',
+                  color: const Color(0xFF138361),
+                  onTap: () => widget.onNavigate(1),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          Row(
+            children: [
+              Expanded(
+                child: _HomeAction(
+                  icon: Icons.warning_amber,
+                  label: 'Denunciar',
+                  color: const Color(0xFFB47700),
+                  onTap: () => widget.onNavigate(3),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: _HomeAction(
+                  icon: Icons.favorite,
+                  label: 'Favoritos',
+                  color: const Color(0xFFCF4B65),
+                  onTap: () => widget.onNavigate(4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 25),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Estações da rede',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF132640),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => widget.onNavigate(1),
+                child: const Text('Ver todas'),
+              ),
+            ],
+          ),
+          FutureBuilder<List<Object>>(
+            future: _summary,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Text(
+                  'Estações indisponíveis no momento.',
+                  style: TextStyle(color: Color(0xFF64748B)),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const SizedBox(
+                  height: 70,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final stations = snapshot.data![0] as List<Map<String, dynamic>>;
+              if (stations.isEmpty) {
+                return const Text('Nenhuma estação cadastrada.');
+              }
+              return Column(
+                children: [
+                  for (final station in stations.take(3))
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 3),
+                      leading: const Icon(
+                        Icons.train_outlined,
+                        color: Color(0xFF138361),
+                      ),
+                      title: Text(
+                        station['name'] as String? ?? 'Estação',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        station['line'] as String? ?? 'Linha não informada',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: Color(0xFF64748B),
+                      ),
+                      onTap: () => widget.onNavigate(1),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
+}
+
+class _HomeAction extends StatelessWidget {
+  const _HomeAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(15),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: SizedBox(
+        height: 92,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 23),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF132640),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Metric extends StatelessWidget {

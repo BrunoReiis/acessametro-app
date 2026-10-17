@@ -118,8 +118,9 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
 }
 
 class IncidentReportScreen extends StatefulWidget {
-  const IncidentReportScreen({super.key, required this.api});
+  const IncidentReportScreen({super.key, required this.api, this.stationId});
   final ApiService api;
+  final String? stationId;
   @override
   State<IncidentReportScreen> createState() => _IncidentReportScreenState();
 }
@@ -142,6 +143,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   @override
   void initState() {
     super.initState();
+    _stationId = widget.stationId;
     _stations = widget.api.getStations();
   }
 

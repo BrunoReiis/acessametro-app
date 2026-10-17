@@ -18,7 +18,8 @@ class _RouteScreenState extends State<RouteScreen> {
   String? _destinationId;
   Map<String, dynamic>? _origin;
   Map<String, dynamic>? _destination;
-  final List<String> _recent = [];
+  final List<({String label, String originId, String destinationId})> _recent =
+      [];
 
   @override
   void initState() {
@@ -38,8 +39,12 @@ class _RouteScreenState extends State<RouteScreen> {
     );
     final label = '${_origin?['name']} → ${_destination?['name']}';
     setState(() {
-      _recent.remove(label);
-      _recent.insert(0, label);
+      _recent.removeWhere((item) => item.label == label);
+      _recent.insert(0, (
+        label: label,
+        originId: _originId!,
+        destinationId: _destinationId!,
+      ));
       if (_recent.length > 3) _recent.removeLast();
     });
   }
@@ -139,13 +144,23 @@ class _RouteScreenState extends State<RouteScreen> {
               ],
               if (_recent.isNotEmpty) ...[
                 const SizedBox(height: 25),
-                const Text(
-                  'Rotas recentes',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF132640),
-                  ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Rotas recentes',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF132640),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(_recent.clear),
+                      child: const Text('Limpar'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 9),
                 for (final item in _recent)
@@ -155,14 +170,26 @@ class _RouteScreenState extends State<RouteScreen> {
                       color: Color(0xFF0868E8),
                     ),
                     title: Text(
-                      item,
+                      item.label,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    trailing: IconButton(
+                      tooltip: 'Remover rota recente',
+                      onPressed: () => setState(() => _recent.remove(item)),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      setState(() {
+                        _originId = item.originId;
+                        _destinationId = item.destinationId;
+                      });
+                      _showRoute(stations);
+                    },
                   ),
               ],
             ],
