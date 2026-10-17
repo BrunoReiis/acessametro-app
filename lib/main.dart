@@ -8,11 +8,82 @@ import 'screens/route_screen.dart';
 import 'screens/stations_screen.dart';
 import 'screens/welcome_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final api = ApiService();
-  await api.restoreSession();
-  runApp(AcessaMetroApp(api: api));
+  runApp(AcessaMetroBootstrap(api: ApiService()));
+}
+
+class AcessaMetroBootstrap extends StatefulWidget {
+  const AcessaMetroBootstrap({super.key, required this.api});
+  final ApiService api;
+
+  @override
+  State<AcessaMetroBootstrap> createState() => _AcessaMetroBootstrapState();
+}
+
+class _AcessaMetroBootstrapState extends State<AcessaMetroBootstrap> {
+  late final Future<void> _sessionRestore;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionRestore = _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      await widget.api.restoreSession().timeout(const Duration(seconds: 3));
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<void>(
+    future: _sessionRestore,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.done) {
+        return AcessaMetroApp(api: widget.api);
+      }
+      return const _AppStartupScreen();
+    },
+  );
+}
+
+class _AppStartupScreen extends StatelessWidget {
+  const _AppStartupScreen();
+
+  @override
+  Widget build(BuildContext context) => const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: Scaffold(
+      backgroundColor: Color(0xFF102C49),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.accessible_forward, size: 58, color: Colors.white),
+            SizedBox(height: 14),
+            Text(
+              'AcessaMetrô',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 24),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                color: Color(0xFFB8E8D2),
+                strokeWidth: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class AcessaMetroApp extends StatelessWidget {
