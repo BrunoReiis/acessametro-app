@@ -3,9 +3,15 @@ import 'package:flutter/material.dart';
 import '../api/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.api, required this.onNavigate});
+  const HomeScreen({
+    super.key,
+    required this.api,
+    required this.onNavigate,
+    required this.onMenu,
+  });
   final ApiService api;
   final ValueChanged<int> onNavigate;
+  final VoidCallback onMenu;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -37,20 +43,25 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
+              IconButton(
+                onPressed: widget.onMenu,
+                tooltip: 'Abrir menu',
+                icon: const Icon(Icons.menu),
+              ),
               Container(
-                width: 42,
-                height: 42,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: const Color(0xFF0868E8),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: const Icon(Icons.train_rounded, color: Colors.white),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 10),
               const Text(
                 'AcessaMetrô',
                 style: TextStyle(
-                  fontSize: 19,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF132640),
                 ),

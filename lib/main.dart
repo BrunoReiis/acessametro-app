@@ -4,7 +4,9 @@ import 'api/api_service.dart';
 import 'screens/account_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/incidents_screen.dart';
+import 'screens/route_screen.dart';
 import 'screens/stations_screen.dart';
+import 'screens/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +58,7 @@ class AcessaMetroApp extends StatelessWidget {
         ),
       ),
     ),
-    home: AppShell(api: api),
+    home: api.token == null ? WelcomeScreen(api: api) : AppShell(api: api),
   );
 }
 
@@ -69,17 +71,25 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   void _selectTab(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    key: _scaffoldKey,
+    drawer: _AppDrawer(onNavigate: _selectTab),
     body: SafeArea(
       bottom: false,
       child: IndexedStack(
         index: _selectedIndex,
         children: [
-          HomeScreen(api: widget.api, onNavigate: _selectTab),
+          HomeScreen(
+            api: widget.api,
+            onNavigate: _selectTab,
+            onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+          ),
           StationsScreen(api: widget.api),
+          RouteScreen(api: widget.api),
           IncidentsScreen(api: widget.api),
           AccountScreen(api: widget.api),
         ],
@@ -100,9 +110,14 @@ class _AppShellState extends State<AppShell> {
           label: 'Estações',
         ),
         NavigationDestination(
-          icon: Icon(Icons.campaign_outlined),
-          selectedIcon: Icon(Icons.campaign),
-          label: 'Relatos',
+          icon: Icon(Icons.alt_route_outlined),
+          selectedIcon: Icon(Icons.alt_route),
+          label: 'Rotas',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.warning_amber_outlined),
+          selectedIcon: Icon(Icons.warning_amber),
+          label: 'Denunciar',
         ),
         NavigationDestination(
           icon: Icon(Icons.person_outline),
@@ -111,5 +126,104 @@ class _AppShellState extends State<AppShell> {
         ),
       ],
     ),
+  );
+}
+
+class _AppDrawer extends StatelessWidget {
+  const _AppDrawer({required this.onNavigate});
+  final ValueChanged<int> onNavigate;
+
+  @override
+  Widget build(BuildContext context) => Drawer(
+    child: SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 16, 18),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.accessible_forward,
+                  color: Color(0xFF0868E8),
+                  size: 29,
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'AcessaMetrô',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  tooltip: 'Fechar menu',
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          _DrawerItem(
+            icon: Icons.home_outlined,
+            label: 'Início',
+            onTap: () => _go(context, 0),
+          ),
+          _DrawerItem(
+            icon: Icons.train_outlined,
+            label: 'Estações',
+            onTap: () => _go(context, 1),
+          ),
+          _DrawerItem(
+            icon: Icons.alt_route_outlined,
+            label: 'Planejar rota',
+            onTap: () => _go(context, 2),
+          ),
+          _DrawerItem(
+            icon: Icons.warning_amber_outlined,
+            label: 'Denunciar problema',
+            onTap: () => _go(context, 3),
+          ),
+          const Divider(height: 24),
+          _DrawerItem(
+            icon: Icons.person_outline,
+            label: 'Meu perfil',
+            onTap: () => _go(context, 4),
+          ),
+          const Spacer(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Text(
+              'AcessaMetrô · 1.0.0',
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  void _go(BuildContext context, int index) {
+    Navigator.pop(context);
+    onNavigate(index);
+  }
+}
+
+class _DrawerItem extends StatelessWidget {
+  const _DrawerItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: Icon(icon, color: const Color(0xFF263B53)),
+    title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+    onTap: onTap,
+    dense: true,
   );
 }
