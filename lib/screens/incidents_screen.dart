@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_service.dart';
+import '../utils/station_search.dart';
 import 'account_screen.dart';
 
 class IncidentsScreen extends StatefulWidget {
@@ -29,7 +30,9 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
       MaterialPageRoute(builder: (_) => IncidentReportScreen(api: widget.api)),
     );
     if (created == true && mounted) {
-      setState(() => _incidents = widget.api.getIncidents());
+      setState(() {
+        _incidents = widget.api.getIncidents();
+      });
     }
   }
 
@@ -82,8 +85,9 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                 : 'Não foi possível carregar os relatos.';
             return _IncidentMessage(
               message: message,
-              retry: () =>
-                  setState(() => _incidents = widget.api.getIncidents()),
+              retry: () => setState(() {
+                _incidents = widget.api.getIncidents();
+              }),
             );
           }
           final incidents = snapshot.data ?? [];
@@ -98,7 +102,18 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
               for (final incident in incidents)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _IncidentTile(incident: incident),
+                  child: _IncidentTile(
+                    incident: incident,
+                    api: widget.api,
+                    isAdmin: widget.api.currentUser?['role'] == 'ADMIN',
+                    onStatusChanged: () {
+                      if (mounted) {
+                        setState(() {
+                          _incidents = widget.api.getIncidents();
+                        });
+                      }
+                    },
+                  ),
                 ),
             ],
           );
@@ -211,25 +226,69 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
                 );
               }
               if (!snapshot.hasData) return const LinearProgressIndicator();
-              return DropdownButtonFormField<String>(
-                initialValue: _stationId,
-                decoration: const InputDecoration(
-                  hintText: 'Selecione uma estação',
+              final stations = snapshot.data!;
+              Map<String, dynamic>? selectedStation;
+              for (final station in stations) {
+                if (station['id'] == _stationId) {
+                  selectedStation = station;
+                  break;
+                }
+              }
+              return Autocomplete<Map<String, dynamic>>(
+                initialValue: TextEditingValue(
+                  text: selectedStation?['name'] as String? ?? '',
                 ),
-                items: snapshot.data!
-                    .map(
-                      (station) => DropdownMenuItem(
-                        value: station['id'] as String,
-                        child: Text(
-                          station['name'] as String? ?? 'Estação',
-                          overflow: TextOverflow.ellipsis,
+                displayStringForOption: (station) =>
+                    station['name'] as String? ?? 'Estação',
+                optionsBuilder: (value) =>
+                    filterStations(stations, value.text).take(12),
+                onSelected: (station) =>
+                    setState(() => _stationId = station['id'] as String),
+                fieldViewBuilder:
+                    (context, controller, focusNode, onFieldSubmitted) =>
+                        TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          onFieldSubmitted: (_) => onFieldSubmitted(),
+                          decoration: const InputDecoration(
+                            hintText: 'Digite o nome ou a linha',
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                          onChanged: (_) {
+                            if (_stationId != null) {
+                              setState(() => _stationId = null);
+                            }
+                          },
+                          validator: (_) => _stationId == null
+                              ? 'Selecione uma estação nas sugestões.'
+                              : null,
                         ),
+                optionsViewBuilder: (context, onSelected, options) => Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 240),
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        children: [
+                          for (final station in options)
+                            ListTile(
+                              title: Text(
+                                station['name'] as String? ?? 'Estação',
+                              ),
+                              subtitle: station['line'] is String
+                                  ? Text(station['line'] as String)
+                                  : null,
+                              onTap: () => onSelected(station),
+                            ),
+                        ],
                       ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _stationId = value),
-                validator: (value) =>
-                    value == null ? 'Selecione uma estação.' : null,
+                    ),
+                  ),
+                ),
               );
             },
           ),
@@ -312,10 +371,81 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _IncidentTile extends StatelessWidget {
-  const _IncidentTile({required this.incident});
+  const _IncidentTile({
+    required this.incident,
+    required this.api,
+    required this.isAdmin,
+    required this.onStatusChanged,
+  });
   final Map<String, dynamic> incident;
+  final ApiService api;
+  final bool isAdmin;
+  final VoidCallback onStatusChanged;
+
+  @override
+  Widget build(BuildContext context) => _IncidentTileContent(
+    incident: incident,
+    api: api,
+    isAdmin: isAdmin,
+    onStatusChanged: onStatusChanged,
+  );
+}
+
+class _IncidentTileContent extends StatefulWidget {
+  const _IncidentTileContent({
+    required this.incident,
+    required this.api,
+    required this.isAdmin,
+    required this.onStatusChanged,
+  });
+
+  final Map<String, dynamic> incident;
+  final ApiService api;
+  final bool isAdmin;
+  final VoidCallback onStatusChanged;
+
+  @override
+  State<_IncidentTileContent> createState() => _IncidentTileContentState();
+}
+
+class _IncidentTileContentState extends State<_IncidentTileContent> {
+  bool _updatingStatus = false;
+
+  Future<void> _updateStatus(String status) async {
+    final incidentId = widget.incident['id'] as String?;
+    if (incidentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível identificar o relato.')),
+      );
+      return;
+    }
+
+    setState(() => _updatingStatus = true);
+    try {
+      await widget.api.updateIncidentStatus(
+        incidentId: incidentId,
+        status: status,
+      );
+      widget.onStatusChanged();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Status do relato atualizado.')),
+        );
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _updatingStatus = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final incident = widget.incident;
     final station = incident['station'] is Map
         ? incident['station'] as Map
         : const {};
@@ -396,6 +526,60 @@ class _IncidentTile extends StatelessWidget {
               color: Color(0xFF64748B),
             ),
           ),
+          if (widget.isAdmin) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _updatingStatus
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : PopupMenuButton<String>(
+                      tooltip: 'Ajustar status do relato',
+                      onSelected: _updateStatus,
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'PENDING',
+                          child: Text('Pendente'),
+                        ),
+                        PopupMenuItem(
+                          value: 'IN_PROGRESS',
+                          child: Text('Em andamento'),
+                        ),
+                        PopupMenuItem(
+                          value: 'RESOLVED',
+                          child: Text('Resolvido'),
+                        ),
+                        PopupMenuItem(
+                          value: 'REJECTED',
+                          child: Text('Encerrado'),
+                        ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 7),
+                            Text('Ajustar status'),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ],
       ),
     );

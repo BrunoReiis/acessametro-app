@@ -249,8 +249,28 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
 
   Future<List<Map<String, dynamic>>> _load() async {
     final ids = await widget.api.getFavoriteStationIds();
+    if (ids.isEmpty) return [];
     final stations = await widget.api.getStations();
     return stations.where((station) => ids.contains(station['id'])).toList();
+  }
+
+  Future<void> _removeFavorite(Map<String, dynamic> station) async {
+    try {
+      await widget.api.toggleFavoriteStation(station['id'] as String);
+      if (mounted) {
+        setState(() {
+          _stations = _load();
+        });
+      }
+    } on Exception catch (error) {
+      if (!mounted) return;
+      final message = error is ApiException
+          ? error.message
+          : 'Não foi possível remover a estação dos favoritos.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
@@ -261,7 +281,20 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Meus favoritos')),
+    appBar: AppBar(
+      title: const Text('Meus favoritos'),
+      actions: [
+        IconButton(
+          tooltip: 'Atualizar favoritos',
+          onPressed: () {
+            setState(() {
+              _stations = _load();
+            });
+          },
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
     body: FutureBuilder<List<Map<String, dynamic>>>(
       future: _stations,
       builder: (context, snapshot) {
@@ -307,7 +340,12 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                 subtitle: Text(
                   station['line'] as String? ?? 'Linha não informada',
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: IconButton(
+                  tooltip:
+                      'Remover ${station['name'] ?? 'estação'} dos favoritos',
+                  onPressed: () => _removeFavorite(station),
+                  icon: const Icon(Icons.favorite, color: Color(0xFFE14D62)),
+                ),
                 onTap: () async {
                   await Navigator.of(context).push<void>(
                     MaterialPageRoute(

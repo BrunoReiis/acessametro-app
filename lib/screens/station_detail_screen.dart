@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_service.dart';
+import '../services/accessibility_notifications.dart';
+import '../utils/accessibility_data.dart';
 import 'account_screen.dart';
 import 'incidents_screen.dart';
 import 'route_screen.dart';
@@ -10,9 +12,11 @@ class StationDetailScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.stationId,
+    this.notifications,
   });
   final ApiService api;
   final String stationId;
+  final AccessibilityNotificationService? notifications;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -37,10 +41,47 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
   }
 
   Future<void> _toggleFavorite() async {
-    final favorites = await widget.api.toggleFavoriteStation(widget.stationId);
-    if (mounted) {
-      setState(() => _favorite = favorites.contains(widget.stationId));
+    try {
+      final favorites = await widget.api.toggleFavoriteStation(
+        widget.stationId,
+      );
+      final added = favorites.contains(widget.stationId);
+      if (mounted) setState(() => _favorite = added);
+      if (!added) return;
+
+      final station = await widget.api.getStation(widget.stationId);
+      if (!mounted) return;
+      final incidents = _maps(station['incidents']);
+      final activeIncidents = activeAccessibilityIncidents(incidents);
+      if (activeIncidents.isEmpty) return;
+
+      final notified =
+          await (widget.notifications ??
+                  LocalAccessibilityNotificationService())
+              .notifyStationIssues(
+                stationId: widget.stationId,
+                stationName: station['name'] as String? ?? 'Estação',
+                incidents: activeIncidents,
+              );
+      if (!notified && mounted) {
+        _showMessage(
+          'Favorito salvo. Ative as notificações do app para receber este aviso.',
+        );
+      }
+    } on Exception catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        error is ApiException
+            ? error.message
+            : 'Não foi possível verificar os problemas da estação.',
+      );
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<bool> _ensureLogin() async {
@@ -366,9 +407,7 @@ class _OverviewTab extends StatelessWidget {
       _InfoRow(
         icon: Icons.accessible_forward,
         label: 'Acessibilidade',
-        value:
-            station['accessibility'] as String? ??
-            'Ainda sem informações da comunidade.',
+        value: accessibilitySummary(station['accessibility']),
       ),
       const SizedBox(height: 12),
       OutlinedButton.icon(
@@ -390,20 +429,13 @@ class _AccessibilityTab extends StatelessWidget {
   final Map<String, dynamic> station;
   @override
   Widget build(BuildContext context) {
-    final detail = station['accessibility'] as String?;
-    final items =
-        detail
-            ?.split(RegExp(r'[,;\n]'))
-            .map((item) => item.trim())
-            .where((item) => item.isNotEmpty)
-            .toList() ??
-        [];
+    final items = parseAccessibilityFeatures(station['accessibility']);
     if (items.isEmpty) {
       return const _EmptyTab(
         icon: Icons.accessible_forward,
-        title: 'Sem informações ainda',
+        title: 'Dados não informados',
         message:
-            'A comunidade ainda não adicionou informações de acessibilidade para esta estação.',
+            'Ainda não há recursos de acessibilidade cadastrados para esta estação.',
       );
     }
     return ListView(
@@ -418,11 +450,17 @@ class _AccessibilityTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 9),
+        const Text(
+          'Os mesmos valores foram cadastrados para todas as estações e não '
+          'foram verificados individualmente.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 9),
         for (final item in items)
           _InfoRow(
             icon: _accessibilityIcon(item),
             label: item,
-            value: 'Informação cadastrada pela comunidade',
+            value: 'Status cadastrado',
           ),
       ],
     );

@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.acessametro.acessametro_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

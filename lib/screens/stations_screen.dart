@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../api/api_service.dart';
+import '../utils/accessibility_data.dart';
+import '../utils/station_search.dart';
 import 'station_detail_screen.dart';
 
 class StationsScreen extends StatefulWidget {
@@ -14,8 +14,8 @@ class StationsScreen extends StatefulWidget {
 
 class _StationsScreenState extends State<StationsScreen> {
   final _search = TextEditingController();
-  Timer? _debounce;
   late Future<List<Map<String, dynamic>>> _stations;
+  String _query = '';
   @override
   void initState() {
     super.initState();
@@ -24,20 +24,12 @@ class _StationsScreenState extends State<StationsScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _search.dispose();
     super.dispose();
   }
 
   void _searchStations(String value) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(
-          () => _stations = widget.api.getStations(search: value.trim()),
-        );
-      }
-    });
+    setState(() => _query = value);
   }
 
   Future<void> _details(Map<String, dynamic> station) async {
@@ -72,6 +64,7 @@ class _StationsScreenState extends State<StationsScreen> {
       TextField(
         controller: _search,
         onChanged: _searchStations,
+        autocorrect: false,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'Buscar estação ou linha',
@@ -103,13 +96,11 @@ class _StationsScreenState extends State<StationsScreen> {
             return _LoadMessage(
               message: message,
               retry: () => setState(
-                () => _stations = widget.api.getStations(
-                  search: _search.text.trim(),
-                ),
+                () => _stations = widget.api.getStations(),
               ),
             );
           }
-          final stations = snapshot.data ?? [];
+          final stations = filterStations(snapshot.data ?? [], _query);
           if (stations.isEmpty) {
             return const _LoadMessage(message: 'Nenhuma estação encontrada.');
           }
@@ -139,7 +130,9 @@ class _StationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final line = station['line'] as String?;
     final zone = station['zone'] as String?;
-    final accessibility = station['accessibility'] as String?;
+    final accessibility = parseAccessibilityFeatures(
+      station['accessibility'],
+    ).join(', ');
     final detail = [
       line,
       zone,
@@ -189,7 +182,7 @@ class _StationTile extends StatelessWidget {
                         color: Color(0xFF64748B),
                       ),
                     ),
-                    if (accessibility != null && accessibility.isNotEmpty) ...[
+                    if (accessibility.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
                         accessibility,

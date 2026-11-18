@@ -34,3 +34,40 @@ flutter test
 ```
 
 As telas de estações, detalhes e relatos consomem os endpoints públicos da API. Login, cadastro e envio de relatos usam autenticação Bearer; o token é guardado no armazenamento seguro nativo do dispositivo.
+
+O app usa Firebase Cloud Messaging (FCM) para avisar sobre novos relatos ativos
+de elevador, escada rolante ou acessibilidade em estações favoritas. Push exige
+uma conta autenticada, permissão de notificações e configuração do Firebase no
+app e na API. Configure as opções públicas do app no build:
+
+```powershell
+flutter run `
+  --dart-define=FIREBASE_PROJECT_ID=seu-projeto `
+  --dart-define=FIREBASE_API_KEY=sua-api-key `
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=seu-sender-id `
+  --dart-define=FIREBASE_ANDROID_APP_ID=seu-app-id-android `
+  --dart-define=FIREBASE_IOS_APP_ID=seu-app-id-ios `
+  --dart-define=FIREBASE_IOS_BUNDLE_ID=com.acessametro.acessametroApp
+```
+
+Obtenha os valores em Firebase Console > Configurações do projeto > Seus apps.
+Cadastre Android `com.acessametro.acessametro_app` e iOS
+`com.acessametro.acessametroApp`. No iOS, configure uma chave APNs em Cloud
+Messaging. As chaves de configuração do app não são credenciais administrativas;
+**nunca** coloque a chave privada da conta de serviço Firebase no app.
+Favoritos feitos sem login permanecem locais e passam a receber push após entrar
+na conta. Para testar push, use um dispositivo real ou emulador com Google Play
+Services; o envio de push não é simulado pelos testes Flutter.
+
+## Planejamento de rotas
+
+O app consulta a API AcessaMetrô, que encaminha as coordenadas selecionadas ao
+Transitous para obter itinerários e trechos de transporte. A disponibilidade
+depende dos feeds e da cobertura do Transitous. Os dados das rotas são
+atribuídos a [Transitous e suas fontes](https://transitous.org/sources/), e o
+mapa usa [OpenStreetMap](https://www.openstreetmap.org/copyright).
+
+O Transitous permite o uso da API somente em projetos não comerciais com
+código-fonte publicado sob uma licença de código aberto. Consulte a
+[política da API](https://transitous.org/api/) antes de publicar ou implantar
+o app.
